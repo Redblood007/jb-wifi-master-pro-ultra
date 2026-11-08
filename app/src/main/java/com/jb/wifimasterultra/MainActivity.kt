@@ -103,6 +103,16 @@ private fun UltraApp(activity: ComponentActivity) {
                 Text("PRO ULTRA", color = Color(0xFF55E6C1), fontSize = 30.sp)
                 Text("Network intelligence dashboard", color = Color.LightGray)
                 Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF122238))) {
+                    Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("DEVICE INFORMATION", color = Color(0xFF55E6C1), fontSize = 13.sp)
+                        Text("Manufacturer: ${Build.MANUFACTURER}", color = Color.White, fontSize = 13.sp)
+                        Text("Model: ${Build.MODEL}", color = Color.White, fontSize = 13.sp)
+                        Text("Android: ${Build.VERSION.RELEASE} • API ${Build.VERSION.SDK_INT}", color = Color.White, fontSize = 13.sp)
+                        Text("Hardware: ${Build.HARDWARE}", color = Color.LightGray, fontSize = 12.sp)
+                        Text("Device identifiers are not collected or uploaded by this panel.", color = Color.Gray, fontSize = 11.sp)
+                    }
+                }
+                Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF122238))) {
                     Column(Modifier.padding(18.dp)) {
                         Text("CURRENT CONNECTION", color = Color(0xFF55E6C1), fontSize = 12.sp)
                         Spacer(Modifier.height(8.dp))
