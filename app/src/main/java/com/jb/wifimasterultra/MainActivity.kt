@@ -55,6 +55,7 @@ private fun UltraApp(activity: ComponentActivity) {
     var trafficMessage by remember { mutableStateOf(readTrafficTotals()) }
     var connectionHistory by remember { mutableStateOf(loadConnectionHistory(context)) }
     var liveNetworkStatus by remember { mutableStateOf("Monitoring network changes…") }
+    var wifiSignalMessage by remember { mutableStateOf(readConnectedWifiSignal(context)) }
 
     DisposableEffect(context) {
         val connectivity = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
@@ -113,6 +114,16 @@ private fun UltraApp(activity: ComponentActivity) {
                         Text("LIVE NETWORK MONITOR", color = Color(0xFF55E6C1), fontSize = 13.sp)
                         Text(liveNetworkStatus, color = Color.White, fontSize = 13.sp)
                         Text("Updates when Android reports a default-network change. Monitoring stops when this screen is disposed.", color = Color.Gray, fontSize = 11.sp)
+                    }
+                }
+                Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF122238))) {
+                    Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("CONNECTED WI-FI SIGNAL", color = Color(0xFF55E6C1), fontSize = 13.sp)
+                        Text(wifiSignalMessage, color = Color.White, fontSize = 13.sp, lineHeight = 21.sp)
+                        Button(onClick = { wifiSignalMessage = readConnectedWifiSignal(context) }, modifier = Modifier.fillMaxWidth()) {
+                            Text("REFRESH WI-FI SIGNAL")
+                        }
+                        Text("Signal and link values are supplied by Android and may be unavailable on some devices or network types.", color = Color.Gray, fontSize = 11.sp)
                     }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -242,6 +253,39 @@ private fun ToolCard(title: String, description: String) {
             Text(title, color = Color.White, fontSize = 17.sp)
             Text(description, color = Color.LightGray, fontSize = 13.sp)
         }
+    }
+}
+
+private fun readConnectedWifiSignal(context: Context): String {
+    return try {
+        val manager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+        @Suppress("DEPRECATION")
+        val info = manager.connectionInfo
+        if (info == null || info.networkId == -1 || info.rssi <= -100) {
+            "No connected Wi-Fi signal information is currently available."
+        } else {
+            val bars = WifiManager.calculateSignalLevel(info.rssi, 5)
+            val quality = when (bars) {
+                4 -> "Excellent"
+                3 -> "Good"
+                2 -> "Fair"
+                1 -> "Weak"
+                else -> "Very weak"
+            }
+            val ssid = info.ssid?.takeIf { it.isNotBlank() && it != "<unknown ssid>" } ?: "SSID hidden"
+            val frequency = if (info.frequency > 0) "${info.frequency} MHz" else "Unavailable"
+            val band = when {
+                info.frequency in 2400..2500 -> "2.4 GHz"
+                info.frequency in 4900..5900 -> "5 GHz"
+                info.frequency in 5925..7125 -> "6 GHz"
+                else -> "Unknown band"
+            }
+            "Network: $ssid\nSignal: $quality ($bars/4) • ${info.rssi} dBm\nLink speed: ${info.linkSpeed} Mbps\nFrequency: $frequency • $band"
+        }
+    } catch (_: SecurityException) {
+        "Android restricted Wi-Fi connection details. Check app permissions and device privacy settings."
+    } catch (e: Exception) {
+        "Wi-Fi signal unavailable: ${e.message ?: "unknown error"}"
     }
 }
 
