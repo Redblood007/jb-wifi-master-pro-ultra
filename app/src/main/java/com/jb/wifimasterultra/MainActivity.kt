@@ -2,6 +2,7 @@ package com.jb.wifimasterultra
 
 import android.Manifest
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
@@ -136,6 +137,25 @@ private fun UltraApp(activity: ComponentActivity) {
                         Spacer(Modifier.height(8.dp))
                         Text(report.details, color = Color.White, lineHeight = 22.sp)
                         Button(onClick = { report = readNetworkReport(context); connectionHistory = saveConnectionSnapshot(context) }, modifier = Modifier.fillMaxWidth()) { Text("REFRESH & SAVE CONNECTION") }
+                        Button(onClick = {
+                            val shareText = buildString {
+                                append("JB WiFi Master Pro Ultra — Network Diagnostics\n\n")
+                                append("Connection: ${report.type}\n")
+                                append("Status: ${report.status}\n")
+                                append("Internet: ${report.internet}\n")
+                                append("Metered: ${report.metered}\n\n")
+                                append("Network details:\n${report.details}\n\n")
+                                append("Connected Wi-Fi signal:\n${readConnectedWifiSignal(context)}\n\n")
+                                append("VPN status: ${readVpnStatus(context)}\n")
+                                append("Generated: ${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())}")
+                            }
+                            val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(Intent.EXTRA_SUBJECT, "JB WiFi Master Pro Ultra diagnostics")
+                                putExtra(Intent.EXTRA_TEXT, shareText)
+                            }
+                            activity.startActivity(Intent.createChooser(sendIntent, "Share network diagnostics"))
+                        }, modifier = Modifier.fillMaxWidth()) { Text("SHARE DIAGNOSTICS REPORT") }
                     }
                 }
                 Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF122238))) {
