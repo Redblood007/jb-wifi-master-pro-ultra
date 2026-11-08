@@ -211,6 +211,8 @@ private fun readNetworkReport(context: Context): NetworkReport {
     val details = buildString {
         append("Internet capability: ").append(caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true).append('\n')
         append("Validated by Android: ").append(validated).append('\n')
+        append("Local IP addresses: ").append(props?.linkAddresses?.joinToString { it.address.hostAddress ?: "Unavailable" } ?: "Unavailable").append('\n')
+        append("Default gateway: ").append(props?.routes?.firstOrNull { it.isDefaultRoute }?.gateway?.hostAddress ?: "Unavailable").append('\n')
         append("DNS servers: ").append(props?.dnsServers?.joinToString() ?: "Unavailable").append('\n')
         append("Interface: ").append(props?.interfaceName ?: "Unavailable")
     }
