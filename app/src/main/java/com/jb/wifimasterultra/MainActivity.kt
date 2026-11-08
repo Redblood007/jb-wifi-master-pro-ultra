@@ -54,6 +54,36 @@ private fun UltraApp(activity: ComponentActivity) {
     var vpnMessage by remember { mutableStateOf(readVpnStatus(context)) }
     var trafficMessage by remember { mutableStateOf(readTrafficTotals()) }
     var connectionHistory by remember { mutableStateOf(loadConnectionHistory(context)) }
+    var liveNetworkStatus by remember { mutableStateOf("Monitoring network changes…") }
+
+    DisposableEffect(context) {
+        val connectivity = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val mainHandler = Handler(Looper.getMainLooper())
+        val callback = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: android.net.Network) {
+                mainHandler.post {
+                    report = readNetworkReport(context)
+                    liveNetworkStatus = "Network became available: ${report.type} • ${report.internet}"
+                    connectionHistory = saveConnectionSnapshot(context)
+                }
+            }
+            override fun onLost(network: android.net.Network) {
+                mainHandler.post {
+                    report = readNetworkReport(context)
+                    liveNetworkStatus = "A network disconnected • ${report.type}"
+                    connectionHistory = saveConnectionSnapshot(context)
+                }
+            }
+            override fun onCapabilitiesChanged(network: android.net.Network, caps: NetworkCapabilities) {
+                mainHandler.post {
+                    report = readNetworkReport(context)
+                    liveNetworkStatus = "Connection updated: ${report.type} • ${report.internet}"
+                }
+            }
+        }
+        connectivity.registerDefaultNetworkCallback(callback)
+        onDispose { connectivity.unregisterNetworkCallback(callback) }
+    }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -76,6 +106,13 @@ private fun UltraApp(activity: ComponentActivity) {
                         Spacer(Modifier.height(8.dp))
                         Text(report.type, color = Color.White, fontSize = 24.sp)
                         Text(report.status, color = Color.LightGray)
+                    }
+                }
+                Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF122238))) {
+                    Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("LIVE NETWORK MONITOR", color = Color(0xFF55E6C1), fontSize = 13.sp)
+                        Text(liveNetworkStatus, color = Color.White, fontSize = 13.sp)
+                        Text("Updates when Android reports a default-network change. Monitoring stops when this screen is disposed.", color = Color.Gray, fontSize = 11.sp)
                     }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
