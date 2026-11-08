@@ -36,13 +36,13 @@ class MainActivity : ComponentActivity() {
 }
 
 private data class WifiItem(val ssid: String, val level: Int, val frequency: Int, val security: String)
-private data class SpeedResult(val ping: String, val download: String, val upload: String, val note: String)
+private data class SpeedResult(val ping: String, val jitter: String, val packetLoss: String, val download: String, val upload: String, val note: String)
 
 @Composable
 private fun UltraApp(activity: ComponentActivity) {
     val context = activity as Context
     var report by remember { mutableStateOf(readNetworkReport(context)) }
-    var speed by remember { mutableStateOf(SpeedResult("--", "--", "--", "Run a test to measure this connection.")) }
+    var speed by remember { mutableStateOf(SpeedResult("--", "--", "--", "--", "--", "Run a test to measure this connection.")) }
     var speedBusy by remember { mutableStateOf(false) }
     var wifiBusy by remember { mutableStateOf(false) }
     var wifiMessage by remember { mutableStateOf("Scan nearby networks you are authorized to use.") }
@@ -88,6 +88,10 @@ private fun UltraApp(activity: ComponentActivity) {
                         Text("INTERNET SPEED TEST", color = Color(0xFF55E6C1), fontSize = 13.sp)
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             MetricCard("PING", speed.ping, Modifier.weight(1f))
+                            MetricCard("JITTER", speed.jitter, Modifier.weight(1f))
+                            MetricCard("LOSS", speed.packetLoss, Modifier.weight(1f))
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             MetricCard("DOWNLOAD", speed.download, Modifier.weight(1f))
                             MetricCard("UPLOAD", speed.upload, Modifier.weight(1f))
                         }
@@ -95,10 +99,10 @@ private fun UltraApp(activity: ComponentActivity) {
                         Button(onClick = {
                             if (!speedBusy) {
                                 speedBusy = true
-                                speed = SpeedResult("Testing", "Testing", "Testing", "Measuring against Cloudflare's public speed-test endpoint…")
+                                speed = SpeedResult("Testing", "Testing", "Testing", "Testing", "Testing", "Measuring against Cloudflare's public speed-test endpoint…")
                                 runSpeedTest(
                                     onResult = { speed = it; speedBusy = false },
-                                    onError = { speed = SpeedResult("--", "--", "--", it); speedBusy = false }
+                                    onError = { speed = SpeedResult("--", "--", "--", "--", "--", it); speedBusy = false }
                                 )
                             }
                         }, enabled = !speedBusy, modifier = Modifier.fillMaxWidth()) {
@@ -185,17 +189,29 @@ private fun runSpeedTest(onResult: (SpeedResult) -> Unit, onError: (String) -> U
     thread {
         try {
             val pingSamples = mutableListOf<Long>()
-            repeat(3) {
-                val connection = URL("https://www.cloudflare.com/cdn-cgi/trace").openConnection() as HttpURLConnection
-                connection.connectTimeout = 8000
-                connection.readTimeout = 8000
-                connection.requestMethod = "GET"
-                val start = System.nanoTime()
-                connection.inputStream.use { it.readBytes() }
-                pingSamples.add((System.nanoTime() - start) / 1_000_000)
-                connection.disconnect()
+            var failedPings = 0
+            repeat(5) {
+                var connection: HttpURLConnection? = null
+                try {
+                    connection = URL("https://www.cloudflare.com/cdn-cgi/trace").openConnection() as HttpURLConnection
+                    connection.connectTimeout = 8000
+                    connection.readTimeout = 8000
+                    connection.requestMethod = "GET"
+                    val start = System.nanoTime()
+                    connection.inputStream.use { input -> input.readBytes() }
+                    pingSamples.add((System.nanoTime() - start) / 1_000_000)
+                } catch (_: Exception) {
+                    failedPings++
+                } finally {
+                    connection?.disconnect()
+                }
             }
+            if (pingSamples.isEmpty()) throw IllegalStateException("All latency probes failed")
             val ping = pingSamples.average().toLong()
+            val jitter = if (pingSamples.size > 1) {
+                pingSamples.zipWithNext { a, b -> kotlin.math.abs(b - a) }.average().toLong()
+            } else 0L
+            val packetLoss = failedPings * 100 / 5
 
             val downloadConnection = URL("https://speed.cloudflare.com/__down?bytes=5000000").openConnection() as HttpURLConnection
             downloadConnection.connectTimeout = 12000
@@ -232,7 +248,7 @@ private fun runSpeedTest(onResult: (SpeedResult) -> Unit, onError: (String) -> U
             uploadConnection.disconnect()
 
             Handler(Looper.getMainLooper()).post {
-                onResult(SpeedResult("${ping} ms", String.format("%.1f Mbps", downloadMbps), String.format("%.1f Mbps", uploadMbps), "Measured using Cloudflare test endpoints. Results vary with server, signal and network load."))
+                onResult(SpeedResult("${ping} ms", "${jitter} ms", "${packetLoss}%", String.format("%.1f Mbps", downloadMbps), String.format("%.1f Mbps", uploadMbps), "Five HTTPS latency probes; loss is failed probes, not ICMP packet loss. Throughput uses Cloudflare endpoints and varies with server and network load."))
             }
         } catch (error: Exception) {
             Handler(Looper.getMainLooper()).post {
