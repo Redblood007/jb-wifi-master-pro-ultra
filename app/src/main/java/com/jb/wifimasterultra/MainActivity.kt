@@ -92,6 +92,11 @@ private fun UltraApp(activity: ComponentActivity) {
                 }
                 Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF122238))) {
                     Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                        Text("CONNECTION HISTORY", color = Color(0xFF55E6C1), fontSize = 13.sp)
+                        Text("Saved locally on this phone. Refresh diagnostics to add a snapshot.", color = Color.LightGray, fontSize = 11.sp)
+                        if (connectionHistory.isEmpty()) Text("No connection snapshots saved yet.", color = Color.Gray)
+                        connectionHistory.forEach { entry -> Text(entry, color = Color.White, fontSize = 12.sp) }
+                        Button(onClick = { connectionHistory = clearConnectionHistory(context) }, enabled = connectionHistory.isNotEmpty(), modifier = Modifier.fillMaxWidth()) { Text("CLEAR HISTORY") }
                         Text("INTERNET SPEED TEST", color = Color(0xFF55E6C1), fontSize = 13.sp)
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             MetricCard("PING", speed.ping, Modifier.weight(1f))
