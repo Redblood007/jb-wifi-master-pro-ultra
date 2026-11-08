@@ -53,6 +53,7 @@ private fun UltraApp(activity: ComponentActivity) {
     var dnsMessage by remember { mutableStateOf("Run a DNS lookup test against example.com.") }
     var vpnMessage by remember { mutableStateOf(readVpnStatus(context)) }
     var trafficMessage by remember { mutableStateOf(readTrafficTotals()) }
+    var connectionHistory by remember { mutableStateOf(loadConnectionHistory(context)) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -86,7 +87,7 @@ private fun UltraApp(activity: ComponentActivity) {
                         Text("NETWORK DETAILS", color = Color(0xFF55E6C1))
                         Spacer(Modifier.height(8.dp))
                         Text(report.details, color = Color.White, lineHeight = 22.sp)
-                        Button(onClick = { report = readNetworkReport(context) }, modifier = Modifier.fillMaxWidth()) { Text("REFRESH DIAGNOSTICS") }
+                        Button(onClick = { report = readNetworkReport(context); connectionHistory = saveConnectionSnapshot(context) }, modifier = Modifier.fillMaxWidth()) { Text("REFRESH & SAVE CONNECTION") }
                     }
                 }
                 Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF122238))) {
@@ -398,4 +399,26 @@ private fun formatBytes(bytes: Long): String {
     var index = 0
     while (value >= 1024.0 && index < units.lastIndex) { value /= 1024.0; index++ }
     return String.format("%.2f %s", value, units[index])
+}
+
+
+private fun loadConnectionHistory(context: Context): List<String> =
+    context.getSharedPreferences("jb_wifi_master_history", Context.MODE_PRIVATE)
+        .getString("entries", "")!!.split("\\n").filter { it.isNotBlank() }
+
+private fun saveConnectionSnapshot(context: Context): List<String> {
+    val report = readNetworkReport(context)
+    val stamp = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
+        .format(java.util.Date())
+    val entry = "$stamp • ${report.type} • ${report.internet}"
+    val prefs = context.getSharedPreferences("jb_wifi_master_history", Context.MODE_PRIVATE)
+    val updated = (listOf(entry) + loadConnectionHistory(context)).take(10)
+    prefs.edit().putString("entries", updated.joinToString("\\n")).apply()
+    return updated
+}
+
+private fun clearConnectionHistory(context: Context): List<String> {
+    context.getSharedPreferences("jb_wifi_master_history", Context.MODE_PRIVATE)
+        .edit().remove("entries").apply()
+    return emptyList()
 }
