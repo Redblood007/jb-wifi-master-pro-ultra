@@ -1,35 +1,25 @@
 # JB WiFi Master Pro Ultra
 
-A standalone Android application for internet diagnostics, Wi-Fi analysis, authorized network security auditing, and VPN diagnostics.
+Native Android app built with Kotlin and Jetpack Compose.
 
-## Project status
+## Implemented in the current development build
+- Network type, Android internet validation, metered state, DNS server and interface display
+- HTTPS latency probes, jitter estimate, failed-probe percentage, download and upload throughput using public Cloudflare endpoints
+- Nearby Wi-Fi scan results with RSSI, frequency, band, channel and advertised security mode (subject to Android permissions and scan throttling)
+- DNS resolution timing for example.com using the device's configured resolver
+- Android VPN transport status detection
 
-This repository is the new, independent project foundation. It is not a completed Android app and does not yet contain an installable APK.
+## Not yet complete / not verified
+- No integrated WireGuard VPN client or VPN server provisioning
+- No signed release APK or Play Store release
+- No device-level QA has been completed; speed-test endpoint behavior and Wi-Fi scan access must be tested on supported phones
+- No persistent history, accounts, remote backend, or router configuration feature
+- Local device inventory and advanced router audit are not implemented
 
-## Planned Android stack
+## Build
+Pushes to main run the Android GitHub Actions workflow. The workflow currently produces a debug APK artifact. Debug builds are for testing and are not signed release packages.
 
-- Kotlin
-- Jetpack Compose
-- Android Wi-Fi and Connectivity APIs
-- Android VpnService with WireGuard integration planned as a separate module
-- Supabase backend integration planned for account and service features
-
-## Planned modules
-
-1. Internet speed, latency, jitter, packet-loss, and DNS diagnostics
-2. Wi-Fi signal, band, channel, and congestion analysis
-3. Authorized network inventory and router security checks
-4. VPN connection diagnostics and WireGuard integration
-5. Traffic usage and connection monitoring
-6. Diagnostic history, reports, and settings
-
-## Security and platform boundaries
-
-- Security testing is limited to networks the user owns or is explicitly authorized to assess.
-- No Wi-Fi password cracking, credential theft, or unauthorized network access.
-- Android version, device hardware, location permissions, and OS restrictions limit available Wi-Fi scan and connection functions.
-- Speed tests measure the current internet path; the app cannot increase ISP-provided bandwidth.
-
-## Build status
-
-Initial repository documentation only. Android source implementation, backend configuration, automated tests, signed APK, and device validation are pending.
+## Platform and safety notes
+- Wi-Fi scan results depend on Android version, location services, permissions, and OS scan throttling.
+- Speed tests measure the current network path; they cannot increase ISP bandwidth.
+- Security diagnostics must only be used on networks the operator owns or is authorized to assess. The app does not crack Wi-Fi passwords or bypass access controls.
