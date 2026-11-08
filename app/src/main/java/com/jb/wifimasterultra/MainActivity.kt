@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.wifi.WifiManager
+import android.net.TrafficStats
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -51,6 +52,7 @@ private fun UltraApp(activity: ComponentActivity) {
     var dnsBusy by remember { mutableStateOf(false) }
     var dnsMessage by remember { mutableStateOf("Run a DNS lookup test against example.com.") }
     var vpnMessage by remember { mutableStateOf(readVpnStatus(context)) }
+    var trafficMessage by remember { mutableStateOf(readTrafficTotals()) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -130,6 +132,14 @@ private fun UltraApp(activity: ComponentActivity) {
                         }, enabled = !dnsBusy, modifier = Modifier.fillMaxWidth()) {
                             Text(if (dnsBusy) "CHECKING DNS…" else "TEST DNS RESOLUTION")
                         }
+                    }
+                }
+                Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF122238))) {
+                    Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                        Text("DEVICE TRAFFIC MONITOR", color = Color(0xFF55E6C1), fontSize = 13.sp)
+                        Text(trafficMessage, color = Color.White, fontSize = 13.sp, lineHeight = 21.sp)
+                        Button(onClick = { trafficMessage = readTrafficTotals() }, modifier = Modifier.fillMaxWidth()) { Text("REFRESH DATA TOTALS") }
+                        Text("Android device-wide totals since the current boot; not limited to this app or Wi-Fi alone.", color = Color.Gray, fontSize = 11.sp)
                     }
                 }
                 Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF122238))) {
@@ -372,4 +382,20 @@ private fun wifiChannel(frequency: Int): Int = when {
     frequency in 5000..5895 -> (frequency - 5000) / 5
     frequency in 5955..7115 -> (frequency - 5950) / 5
     else -> 0
+}
+
+
+private fun readTrafficTotals(): String {
+    val received = TrafficStats.getTotalRxBytes()
+    val sent = TrafficStats.getTotalTxBytes()
+    if (received < 0L || sent < 0L) return "Traffic counters are unavailable on this Android device."
+    return "Received: ${formatBytes(received)}\nSent: ${formatBytes(sent)}"
+}
+
+private fun formatBytes(bytes: Long): String {
+    val units = listOf("B", "KB", "MB", "GB", "TB")
+    var value = bytes.toDouble()
+    var index = 0
+    while (value >= 1024.0 && index < units.lastIndex) { value /= 1024.0; index++ }
+    return String.format("%.2f %s", value, units[index])
 }
