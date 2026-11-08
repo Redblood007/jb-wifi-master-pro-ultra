@@ -99,9 +99,16 @@ private fun UltraApp(activity: ComponentActivity) {
     MaterialTheme(colorScheme = darkColorScheme(primary = Color(0xFF55E6C1), background = Color(0xFF07111F), surface = Color(0xFF122238))) {
         Surface(Modifier.fillMaxSize(), color = Color(0xFF07111F)) {
             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                Text("JB WIFI MASTER", color = Color.White, fontSize = 13.sp, letterSpacing = 3.sp)
-                Text("PRO ULTRA", color = Color(0xFF55E6C1), fontSize = 30.sp)
-                Text("Network intelligence dashboard", color = Color.LightGray)
+                Text("JB WIFI MASTER", color = Color.White, fontSize = 12.sp, letterSpacing = 3.sp)
+                Text("PRO ULTRA", color = Color(0xFF55E6C1), fontSize = 32.sp)
+                Text("Your network. Clearly understood.", color = Color.LightGray, fontSize = 14.sp)
+                Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF17364A)), modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("NETWORK HEALTH", color = Color(0xFF55E6C1), fontSize = 12.sp, letterSpacing = 1.5.sp)
+                        Text(networkHealthSummary(context), color = Color.White, fontSize = 21.sp)
+                        Text("Based on Android's live internet validation and available Wi-Fi signal data. This is a diagnostic indicator, not an ISP speed rating.", color = Color.LightGray, fontSize = 11.sp, lineHeight = 16.sp)
+                    }
+                }
                 Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF122238))) {
                     Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text("DEVICE INFORMATION", color = Color(0xFF55E6C1), fontSize = 13.sp)
@@ -283,6 +290,33 @@ private fun ToolCard(title: String, description: String) {
             Text(title, color = Color.White, fontSize = 17.sp)
             Text(description, color = Color.LightGray, fontSize = 13.sp)
         }
+    }
+}
+
+private fun networkHealthSummary(context: Context): String {
+    return try {
+        val manager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val caps = manager.activeNetwork?.let { manager.getNetworkCapabilities(it) }
+        if (caps == null || !caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) {
+            "No active internet connection"
+        } else if (!caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)) {
+            "Internet not verified"
+        } else if (caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
+            val wifi = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+            @Suppress("DEPRECATION")
+            val rssi = wifi.connectionInfo?.rssi ?: -127
+            when {
+                rssi >= -60 -> "Excellent Wi-Fi connection"
+                rssi >= -67 -> "Good Wi-Fi connection"
+                rssi >= -75 -> "Fair Wi-Fi signal"
+                rssi > -100 -> "Weak Wi-Fi signal"
+                else -> "Internet verified • Signal unavailable"
+            }
+        } else {
+            "Internet connection verified"
+        }
+    } catch (_: Exception) {
+        "Network health unavailable"
     }
 }
 
