@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import java.net.HttpURLConnection
+import java.net.InetAddress
 import java.net.URL
 import kotlin.concurrent.thread
 
@@ -35,7 +36,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private data class WifiItem(val ssid: String, val level: Int, val frequency: Int, val security: String)
+private data class WifiItem(val ssid: String, val level: Int, val frequency: Int, val channel: String, val band: String, val security: String)
 private data class SpeedResult(val ping: String, val jitter: String, val packetLoss: String, val download: String, val upload: String, val note: String)
 
 @Composable
@@ -47,6 +48,9 @@ private fun UltraApp(activity: ComponentActivity) {
     var wifiBusy by remember { mutableStateOf(false) }
     var wifiMessage by remember { mutableStateOf("Scan nearby networks you are authorized to use.") }
     var wifiItems by remember { mutableStateOf(emptyList<WifiItem>()) }
+    var dnsBusy by remember { mutableStateOf(false) }
+    var dnsMessage by remember { mutableStateOf("Run a DNS lookup test against example.com.") }
+    var vpnMessage by remember { mutableStateOf(readVpnStatus(context)) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -112,6 +116,34 @@ private fun UltraApp(activity: ComponentActivity) {
                 }
                 Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF122238))) {
                     Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                        Text("DNS DIAGNOSTICS", color = Color(0xFF55E6C1), fontSize = 13.sp)
+                        Text(dnsMessage, color = Color.LightGray, fontSize = 12.sp)
+                        Button(onClick = {
+                            if (!dnsBusy) {
+                                dnsBusy = true
+                                dnsMessage = "Resolving example.com…"
+                                runDnsCheck(
+                                    onResult = { dnsMessage = it; dnsBusy = false },
+                                    onError = { dnsMessage = it; dnsBusy = false }
+                                )
+                            }
+                        }, enabled = !dnsBusy, modifier = Modifier.fillMaxWidth()) {
+                            Text(if (dnsBusy) "CHECKING DNS…" else "TEST DNS RESOLUTION")
+                        }
+                    }
+                }
+                Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF122238))) {
+                    Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("VPN STATUS", color = Color(0xFF55E6C1), fontSize = 13.sp)
+                        Text(vpnMessage, color = Color.LightGray, fontSize = 12.sp)
+                        Button(onClick = { vpnMessage = readVpnStatus(context) }, modifier = Modifier.fillMaxWidth()) {
+                            Text("REFRESH VPN STATUS")
+                        }
+                        Text("This reports Android VPN transport state; it does not connect a VPN server.", color = Color.Gray, fontSize = 11.sp)
+                    }
+                }
+                Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF122238))) {
+                    Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
                         Text("WI-FI ANALYZER", color = Color(0xFF55E6C1), fontSize = 13.sp)
                         Text(wifiMessage, color = Color.LightGray, fontSize = 12.sp)
                         Button(onClick = {
@@ -126,7 +158,7 @@ private fun UltraApp(activity: ComponentActivity) {
                         wifiItems.forEach { item ->
                             Column {
                                 Text(item.ssid, color = Color.White)
-                                Text("${item.level} dBm • ${item.frequency} MHz • ${item.security}", color = Color.LightGray, fontSize = 11.sp)
+                                Text("${item.level} dBm • ${item.band} ch ${item.channel} • ${item.frequency} MHz • ${item.security}", color = Color.LightGray, fontSize = 11.sp)
                             }
                             HorizontalDivider(color = Color(0xFF29415C))
                         }
@@ -281,7 +313,7 @@ private fun scanWifi(
                             result.capabilities.contains("ESS") -> "Open / legacy"
                             else -> "Unknown"
                         }
-                        WifiItem(result.SSID.ifBlank { "(Hidden network)" }, result.level, result.frequency, security)
+                        WifiItem(result.SSID.ifBlank { "(Hidden network)" }, result.level, result.frequency, wifiChannel(result.frequency).toString(), wifiBand(result.frequency), security)
                     }
                 onItems(results)
                 onMessage(if (results.isEmpty()) "No scan results. Enable device location and Wi-Fi, then retry. Android may throttle scans." else "Found ${results.size} visible networks. Scan availability is controlled by Android.")
@@ -298,4 +330,44 @@ private fun scanWifi(
         onMessage("Wi-Fi scan unavailable: ${e.message ?: "unknown error"}")
         onBusy(false)
     }
+}
+
+private fun readVpnStatus(context: Context): String {
+    val manager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+    val vpnActive = manager.allNetworks.any { network ->
+        manager.getNetworkCapabilities(network)?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
+    }
+    return if (vpnActive) "Android reports an active VPN transport." else "No active Android VPN transport detected."
+}
+
+private fun runDnsCheck(onResult: (String) -> Unit, onError: (String) -> Unit) {
+    thread {
+        try {
+            val start = System.nanoTime()
+            val addresses = InetAddress.getAllByName("example.com").map { it.hostAddress ?: "unknown" }.distinct()
+            val elapsed = (System.nanoTime() - start) / 1_000_000
+            Handler(Looper.getMainLooper()).post {
+                onResult("DNS resolution succeeded in ${elapsed} ms. Addresses: ${addresses.joinToString()}")
+            }
+        } catch (e: Exception) {
+            Handler(Looper.getMainLooper()).post {
+                onError("DNS lookup failed: ${e.message ?: "unknown error"}. Check connectivity or private DNS settings.")
+            }
+        }
+    }
+}
+
+private fun wifiBand(frequency: Int): String = when {
+    frequency in 2400..2500 -> "2.4 GHz"
+    frequency in 4900..5900 -> "5 GHz"
+    frequency in 5925..7125 -> "6 GHz"
+    else -> "Unknown band"
+}
+
+private fun wifiChannel(frequency: Int): Int = when {
+    frequency == 2484 -> 14
+    frequency in 2412..2472 -> (frequency - 2407) / 5
+    frequency in 5000..5895 -> (frequency - 5000) / 5
+    frequency in 5955..7115 -> (frequency - 5950) / 5
+    else -> 0
 }
